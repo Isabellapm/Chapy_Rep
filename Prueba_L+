@@ -1,0 +1,92 @@
+#define TFT_DC 8    // Pin DC (Datos/Comandos)
+#define TFT_RST 9   // Pin de reinicio (RESET)
+#define SCR_WD 240  // Ancho de la pantalla
+#define SCR_HT 240  // Altura de la pantalla
+#define GYRO_X_OFFSET 220  // Gyro X offset
+#define GYRO_Y_OFFSET 76   // Gyro Y offset
+#define GYRO_Z_OFFSET -85  // Gyro Z offset
+#define ACCEL_Z_OFFSET 1688 // Accelerometer Z offset
+#define PACKET_SIZE 48 // Adjust this based on the MPU6050 documentation
+
+#include <SPI.h>                  // Protocolo de comunicación SPI
+#include <Adafruit_GFX.h>         // Biblioteca gráfica para pantallas
+#include <ST7789_AVR.h>           // Biblioteca para controlar pantallas ST7789
+
+#include "I2Cdev.h"
+#include "MPU6050_6Axis_MotionApps20.h"
+#include "Wire.h"
+
+ST7789_AVR lcd = ST7789_AVR(TFT_DC, TFT_RST); // Initialize the display
+MPU6050 mpu;
+
+bool dmpReady = false;
+uint8_t mpuIntStatus;
+uint8_t devStatus;
+uint16_t fifoCount;
+uint8_t fifoBuffer[64];
+
+Quaternion q;
+VectorFloat gravity;
+float ypr[3];
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+  Wire.setClock(400000);
+
+  Serial.println("Iniciando MPU6050...");
+  mpu.initialize();
+
+  devStatus = mpu.dmpInitialize();
+
+  // Calibración opcional
+  mpu.setXGyroOffset(GYRO_X_OFFSET);
+  mpu.setYGyroOffset(GYRO_Y_OFFSET);
+  mpu.setZGyroOffset(GYRO_Z_OFFSET);
+  mpu.setZAccelOffset(ACCEL_Z_OFFSET);
+
+  if (devStatus == 0) {
+    Serial.println("DMP listo, iniciando...");
+    mpu.setDMPEnabled(true);
+    mpuIntStatus = mpu.getIntStatus();
+    dmpReady = true;
+  } else {
+    Serial.print("Error al iniciar DMP: ");
+    Serial.println(devStatus);
+  }
+
+  // Initialize the display
+  if (!lcd.init(SCR_WD, SCR_HT)) {
+    Serial.println("Error initializing display!");
+    while (1); // Halt if display fails to initialize
+  }
+  
+  lcd.fillScreen(RED);            // Fill the screen with red
+  lcd.setCursor(0, 0);            // Set cursor position
+  lcd.setTextColor(WHITE, BLUE);  // Set text color
+  lcd.setTextSize(2);             // Set text size
+}
+
+void loop() {
+  if (!dmpReady) return;
+
+  fifoCount = mpu.getFIFOCount();
+
+  if (fifoCount == 1024) {
+    mpu.resetFIFO();
+    return;
+  }
+
+  if (fifoCount < PACKET_SIZE) return;
+
+  mpu.getFIFOBytes(fifoBuffer, PACKET_SIZE);
+  mpu.dmpGetQuaternion(&q, fifoBuffer);
+  mpu.dmpGetGravity(&gravity, &q);
+  mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+
+  lcd.println("\tGiro: ");
+  lcd.println(ypr[1] * 180 / M_PI);
+  lcd.setCursor(0, 0);
+
+  delay(100); // Control the update rate of the display
+}
