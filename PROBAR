@@ -1,0 +1,126 @@
+/*
+ * Arduino Sketch for a menu-driven interface using buttons and a TFT display.
+ * 
+ * - Btn 1: Change selected option
+ * - Btn 2: Confirm selected option
+ * - Btn 3: Exit
+ * - Rocker switch: Power on/off the device
+ * 
+ * Menu Options:
+ * - Calibrate
+ * - Start Measurement
+ * - Measurement Complete Message
+ * - Export Data
+ */
+
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_ST7789.h>
+#include <Adafruit_MPU6050.h>
+
+// Pin Definitions
+#define BTN1_PIN 3
+#define BTN2_PIN 4
+#define BTN3_PIN 5
+#define TFT_CS    10
+#define TFT_RST   9
+#define TFT_DC    8
+#define ROCKER_SWITCH_PIN 2
+
+// TFT Display
+Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
+
+// MPU6050
+Adafruit_MPU6050 mpu;
+
+// Menu Variables
+int currentOption = 0;
+const char* menuOptions[] = {"Calibrate", "Start Measurement", 
+                             "Measurement Complete", "Export Data"};
+const int numOptions = sizeof(menuOptions) / sizeof(menuOptions[0]);
+
+void setup() {
+  pinMode(BTN1_PIN, INPUT_PULLUP);
+  pinMode(BTN2_PIN, INPUT_PULLUP);
+  pinMode(BTN3_PIN, INPUT_PULLUP);
+  pinMode(ROCKER_SWITCH_PIN, INPUT_PULLUP);
+
+  tft.init(240, 240);
+  tft.setRotation(2);
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setTextColor(ST77XX_WHITE);
+  tft.setTextSize(2);
+
+  if (!mpu.begin()) {
+    tft.println("MPU6050 not found!");
+    while (1);
+  }
+
+  displayMenu();
+}
+
+void loop() {
+  if (digitalRead(ROCKER_SWITCH_PIN) == LOW) {
+    tft.fillScreen(ST77XX_BLACK);
+    tft.println("Device Off");
+    while (digitalRead(ROCKER_SWITCH_PIN) == LOW);
+    displayMenu();
+  }
+
+  if (digitalRead(BTN1_PIN) == LOW) {
+    currentOption = (currentOption + 1) % numOptions;
+    displayMenu();
+    delay(200);
+  }
+
+  if (digitalRead(BTN2_PIN) == LOW) {
+    executeOption(currentOption);
+    delay(200);
+  }
+
+  if (digitalRead(BTN3_PIN) == LOW) {
+    tft.fillScreen(ST77XX_BLACK);
+    tft.println("Exiting...");
+    delay(1000);
+    displayMenu();
+  }
+}
+
+void displayMenu() {
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(0, 0);
+  for (int i = 0; i < numOptions; i++) {
+    if (i == currentOption) {
+      tft.setTextColor(ST77XX_GREEN);
+    } else {
+      tft.setTextColor(ST77XX_WHITE);
+    }
+    tft.println(menuOptions[i]);
+  }
+}
+
+void executeOption(int option) {
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(0, 0);
+  switch (option) {
+    case 0:
+      tft.println("Calibrating...");
+      // Add calibration code here
+      break;
+    case 1:
+      tft.println("Starting Measurement...");
+      // Add measurement code here
+      break;
+    case 2:
+      tft.println("Measurement Complete");
+      // Add completion message code here
+      break;
+    case 3:
+      tft.println("Exporting Data...");
+      // Add data export code here
+      break;
+  }
+  delay(1000);
+  displayMenu();
+}
+//
